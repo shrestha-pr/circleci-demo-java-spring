@@ -25,22 +25,14 @@ jobs:
       # Customize the JVM maximum heap limit
       JVM_OPTS: -Xmx3200m
       GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2"
-      TERM: dumb
-
     steps:
       - checkout
-
-      # Download and cache dependencies
       - restore_cache:
           key: v1-gradle-wrapper-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
       - restore_cache:
-          keys:
-            - v1-dependencies-{{ checksum "build.gradle" }}
-            # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
-
+          key: v1-gradle-cache-{{ checksum "build.gradle" }}
       - run:
-        name: Run tests in parallel # See: https://circleci.com/docs/2.0/parallelism-faster-jobs/
+          name: Run tests in parallel # See: https://circleci.com/docs/2.0/parallelism-faster-jobs/
           # Use "./gradlew test" instead if tests are not run in parallel
           command: |
             cd src/test/java
@@ -49,11 +41,11 @@ jobs:
               | cut -c 1- | sed 's@/@.@g' \
               | sed 's/.\{5\}$//' \
               | circleci tests split --split-by=timings --timings-type=classname)
-              cd ../../..
+            cd ../../..
             # Format the arguments to "./gradlew test"
-             GRADLE_ARGS=$(echo $CLASSNAMES | awk '{for (i=1; i<=NF; i++) print "--tests",$i}')
-             echo "Prepared arguments for Gradle: $GRADLE_ARGS"
-             ./gradlew test $GRADLE_ARGS
+            GRADLE_ARGS=$(echo $CLASSNAMES | awk '{for (i=1; i<=NF; i++) print "--tests",$i}')
+            echo "Prepared arguments for Gradle: $GRADLE_ARGS"
+            ./gradlew test $GRADLE_ARGS
       - save_cache:
           paths:
             - ~/.gradle/wrapper
@@ -70,16 +62,17 @@ jobs:
         when: always
       - run:
           name: Assemble Jar
-           command: |
+          command: |
             # Skip this for other nodes
             if [ "$CIRCLE_NODE_INDEX" == 0 ]; then
               ./gradlew assemble
             fi
       # As the JAR was only assembled in the first build container, build/libs will be empty in all the other build containers.
       - store_artifacts:
-        path: build/libs
-  workflows:
-    version: 2
-    workflow:
-      jobs:
+            path: build/libs
+workflows:
+  version: 2
+  workflow:
+    jobs:
       - build 
+
